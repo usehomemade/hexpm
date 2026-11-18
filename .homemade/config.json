@@ -1,7 +1,7 @@
 {
   "$schema": "https://homemade.dev/schemas/latest/config.json",
   "setup": [
-    "apt-get update && apt-get install -y --no-install-recommends build-essential git ca-certificates postgresql-client"
+    "apt-get update && apt-get install -y --no-install-recommends build-essential git ca-certificates postgresql-client inotify-tools"
   ],
   "warmup": [
     "mix local.hex --force && mix local.rebar --force && mix deps.get --check-locked",
@@ -9,7 +9,8 @@
   ],
   "install": [
     "mix local.hex --force && mix local.rebar --force && mix deps.get --check-locked",
-    "mix compile && mix do esbuild.install --if-missing + tailwind.install --if-missing + generate_lumis_css"
+    "mix compile && mix do esbuild.install --if-missing + tailwind.install --if-missing + generate_lumis_css",
+    "mkdir -p tmp/homemade && printf '%s\\n' 'import Config' 'import_config \"../../config/config.exs\"' 'base = System.fetch_env!(\"APP_URL\") |> String.trim_trailing(\"/\")' 'uri = URI.parse(base)' 'config :hexpm, host: uri.host, cdn_url: base, email_base_url: base, img_url: base <> \"/img\", docs_url: base, private_docs_url: base, readme_host: uri.host, readme_url: base' 'config :hexpm, HexpmWeb.Endpoint, http: [ip: {0, 0, 0, 0}, port: String.to_integer(System.get_env(\"PORT\", \"4000\"))], url: [scheme: uri.scheme, host: uri.host, port: uri.port], secret_key_base: Base.encode64(:crypto.hash(:sha512, System.fetch_env!(\"SECRET_KEY_BASE\"))), check_origin: false' > tmp/homemade/dev.exs"
   ],
   "services": {
     "db": {
@@ -19,7 +20,7 @@
       "order": 1
     },
     "web": {
-      "cmd": "sh .homemade/database.sh && exec mix do loadconfig .homemade/dev.exs + phx.server",
+      "cmd": "timeout 120 sh -c 'until pg_isready -h 127.0.0.1 -p 5432 -U postgres -q; do sleep 1; done' && mix do loadconfig tmp/homemade/dev.exs + ecto.create + ecto.load --skip-if-loaded + ecto.migrate + run -e 'unless Hexpm.Repo.get_by(Hexpm.Accounts.User, username: \"eric\"), do: Code.eval_file(\"priv/repo/seeds.exs\")' && exec mix do loadconfig tmp/homemade/dev.exs + phx.server",
       "port": 4000,
       "url": true,
       "healthcheck": {
