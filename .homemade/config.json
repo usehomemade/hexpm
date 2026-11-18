@@ -1,0 +1,36 @@
+{
+  "$schema": "https://homemade.dev/schemas/latest/config.json",
+  "setup": [
+    "apt-get update && apt-get install -y --no-install-recommends build-essential git ca-certificates postgresql-client"
+  ],
+  "warmup": [
+    "mix local.hex --force && mix local.rebar --force && mix deps.get --check-locked",
+    "mix compile && mix do esbuild.install --if-missing + tailwind.install --if-missing + generate_lumis_css"
+  ],
+  "install": [
+    "mix local.hex --force && mix local.rebar --force && mix deps.get --check-locked",
+    "mix compile && mix do esbuild.install --if-missing + tailwind.install --if-missing + generate_lumis_css"
+  ],
+  "services": {
+    "db": {
+      "cmd": "docker compose -f docker-compose.yaml up",
+      "port": 5432,
+      "displayName": "PostgreSQL",
+      "order": 1
+    },
+    "web": {
+      "cmd": "sh .homemade/database.sh && exec mix do loadconfig .homemade/dev.exs + phx.server",
+      "port": 4000,
+      "url": true,
+      "healthcheck": {
+        "path": "/"
+      },
+      "displayName": "Phoenix",
+      "order": 0
+    }
+  },
+  "env_schema": [
+    "APP_URL",
+    "SECRET_KEY_BASE"
+  ]
+}
